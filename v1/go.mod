@@ -1,4 +1,4 @@
-module github.com/chloyka/httpbara/v1
+module github.com/gopybara/httpbara/v1
 
 go 1.23
 
