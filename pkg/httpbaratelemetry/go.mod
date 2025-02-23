@@ -6,7 +6,7 @@ toolchain go1.23.3
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/gopybara/httpbara v1.0.4
+	github.com/gopybara/httpbara v0.0.1
 	go.opentelemetry.io/otel v1.34.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.34.0
 	go.opentelemetry.io/otel/sdk v1.34.0
