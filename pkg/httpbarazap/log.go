@@ -46,18 +46,22 @@ func (l *zapLogger) mapFields(fields ...any) []zap.Field {
 			if expectingKey {
 				key = field.(string)
 			} else {
+				var zapField zap.Field
+
 				switch field.(type) {
 				case string:
-					field = zap.String(key, field.(string))
+					zapField = zap.String(key, field.(string))
 				case int:
-					field = zap.Int(key, field.(int))
+					zapField = zap.Int(key, field.(int))
 				case int64:
-					field = zap.Int64(key, field.(int64))
+					zapField = zap.Int64(key, field.(int64))
 				case float64:
-					field = zap.Float64(key, field.(float64))
+					zapField = zap.Float64(key, field.(float64))
 				default:
-					field = zap.Any(key, field)
+					zapField = zap.Any(key, field)
 				}
+
+				result = append(result, zapField)
 
 				key = ""
 			}
