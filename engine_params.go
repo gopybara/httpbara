@@ -9,7 +9,7 @@ import (
 type params struct {
 	gin             *gin.Engine
 	log             Logger
-	rootMiddlewares []*Middleware
+	rootMiddlewares []*Handler
 	shutdownTimeout time.Duration
 	taskTracker     TaskTracker
 
@@ -35,7 +35,7 @@ func WithGinEngine(r *gin.Engine) ParamsCb {
 	}
 }
 
-func WithRootMiddlewares(middlewares ...*Middleware) ParamsCb {
+func WithRootMiddlewares(middlewares ...*Handler) ParamsCb {
 	return func(params *params) error {
 		params.rootMiddlewares = middlewares
 

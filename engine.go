@@ -258,7 +258,9 @@ func (c *core) applyHandlers() {
 		path := route.path
 		handleStack := make([]gin.HandlerFunc, 0)
 		for _, mw := range c.rootMiddlewares {
-			handleStack = append(handleStack, mw.handler)
+			for _, middleware := range mw.middlewares {
+				handleStack = append(handleStack, middleware.handler)
+			}
 		}
 
 		// Apply group prefix and group-level middleware if route has a group

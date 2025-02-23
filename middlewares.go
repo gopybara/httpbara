@@ -5,17 +5,17 @@ import (
 	"time"
 )
 
-type iAccessLogMiddleware struct {
+type accessLogMiddlewareDescriber struct {
 	AccessLogMiddleware Middleware `middleware:"log"`
 }
 
-type accessLogMiddlewareImpl struct {
-	iAccessLogMiddleware
+type accessLogMiddleware struct {
+	accessLogMiddlewareDescriber
 
 	log Logger
 }
 
-func (alm *accessLogMiddlewareImpl) AccessLogMiddleware(ctx *gin.Context) {
+func (alm *accessLogMiddleware) AccessLogMiddleware(ctx *gin.Context) {
 	ts := time.Now()
 	fields := []interface{}{
 		"method", ctx.Request.Method,
@@ -48,13 +48,13 @@ func AddLogFieldToAccessLog(ctx *gin.Context, value ...interface{}) {
 	*logFields = append(*logFields, value...)
 }
 
-func NewAccessLogMiddleware(log Logger) *Middleware {
-	alm := &accessLogMiddlewareImpl{
+func NewAccessLogMiddleware(log Logger) (*Handler, error) {
+	alm := &accessLogMiddleware{
 		log: log,
 	}
 
-	return &Middleware{
+	return AsHandler(&Middleware{
 		handler:    alm.AccessLogMiddleware,
 		middleware: "log",
-	}
+	})
 }
