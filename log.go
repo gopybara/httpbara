@@ -12,15 +12,13 @@ type Logger interface {
 	Error(message string, args ...any)
 	Panic(message string, args ...any)
 	Warn(message string, args ...any)
-
-	mapFields(fields ...any) string
 }
 
-type FmtLogger struct {
+type fmtLogger struct {
 	Logger
 }
 
-func (l *FmtLogger) mapFields(fields ...any) string {
+func (l *fmtLogger) mapFields(fields ...any) string {
 	if len(fields)%2 != 0 {
 		return ""
 	}
@@ -37,9 +35,10 @@ func (l *FmtLogger) mapFields(fields ...any) string {
 	return sb.String()
 }
 
-func (l *FmtLogger) log(level string, message string, args ...any) {
+func (l *fmtLogger) log(level string, message string, args ...any) {
 	timestamp := time.Now().Format(time.RFC3339)
 	fields := l.mapFields(args...)
+
 	if fields != "" {
 		fmt.Printf("%s [%s] %s %s\n", timestamp, level, message, fields)
 	} else {
@@ -47,27 +46,27 @@ func (l *FmtLogger) log(level string, message string, args ...any) {
 	}
 }
 
-func (l *FmtLogger) Info(message string, args ...any) {
+func (l *fmtLogger) Info(message string, args ...any) {
 	l.log("INFO", message, args...)
 }
 
-func (l *FmtLogger) Debug(message string, args ...any) {
+func (l *fmtLogger) Debug(message string, args ...any) {
 	l.log("DEBUG", message, args...)
 }
 
-func (l *FmtLogger) Error(message string, args ...any) {
+func (l *fmtLogger) Error(message string, args ...any) {
 	l.log("ERROR", message, args...)
 }
 
-func (l *FmtLogger) Panic(message string, args ...any) {
+func (l *fmtLogger) Panic(message string, args ...any) {
 	l.log("PANIC", message, args...)
 	panic(message)
 }
 
-func (l *FmtLogger) Warn(message string, args ...any) {
+func (l *fmtLogger) Warn(message string, args ...any) {
 	l.log("WARN", message, args...)
 }
 
-func NewFmtLogger() *FmtLogger {
-	return &FmtLogger{}
+func NewFmtLogger() Logger {
+	return &fmtLogger{}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"sync/atomic"
 )
 
@@ -12,9 +13,19 @@ var (
 	// the shutdown process has already been initiated. Once the tracker
 	// begins terminating, no new tasks can be registered.
 	ErrTerminating = errors.New("received terminating signal")
+
+	// ErrTaskTrackerNotFound is returned when the specified task tracker cannot be located or does not exist.
+	ErrTaskTrackerNotFound = errors.New("task tracker not found")
 )
 
-// ActiveTaskTracker is a utility for managing and monitoring a group of
+type TaskTracker interface {
+	StartTask() error
+	FinishTask()
+	TaskCount() int32
+	Shutdown(ctx context.Context) error
+}
+
+// activeTaskTracker is a utility for managing and monitoring a group of
 // concurrent tasks. It keeps track of the number of tasks currently running,
 // and provides a controlled way to initiate shutdown and wait for all tasks
 // to complete.
@@ -27,7 +38,7 @@ var (
 // This is particularly useful in servers or background processes where you
 // need to gracefully shut down, ensuring all ongoing operations complete
 // before the application fully stops.
-type ActiveTaskTracker struct {
+type activeTaskTracker struct {
 	// count holds the current number of active tasks.
 	count atomic.Int32
 
@@ -52,7 +63,7 @@ type ActiveTaskTracker struct {
 // Returns:
 //   - nil if the task was successfully started.
 //   - ErrTerminating if the tracker is in the process of shutting down.
-func (t *ActiveTaskTracker) StartTask() error {
+func (t *activeTaskTracker) StartTask() error {
 	if t.ctx.Err() != nil {
 		return ErrTerminating
 	}
@@ -66,7 +77,7 @@ func (t *ActiveTaskTracker) StartTask() error {
 // initiated (ctx is canceled) and this results in zero remaining tasks, it
 // sends a signal on the doneCh channel to unblock any waiting Shutdown()
 // calls.
-func (t *ActiveTaskTracker) FinishTask() {
+func (t *activeTaskTracker) FinishTask() {
 	t.count.Add(-1)
 	if t.ctx.Err() != nil && t.count.Load() == 0 {
 		t.doneCh <- true
@@ -76,7 +87,7 @@ func (t *ActiveTaskTracker) FinishTask() {
 // TaskCount returns the current number of active tasks. This can be used
 // for monitoring or logging purposes, providing visibility into the number
 // of tasks currently running.
-func (t *ActiveTaskTracker) TaskCount() int32 {
+func (t *activeTaskTracker) TaskCount() int32 {
 	return t.count.Load()
 }
 
@@ -92,7 +103,7 @@ func (t *ActiveTaskTracker) TaskCount() int32 {
 // You might call Shutdown() in response to receiving a termination signal
 // (e.g., SIGTERM) in a server. This ensures that all in-flight requests or
 // background jobs complete before the program exits.
-func (t *ActiveTaskTracker) Shutdown(ctx context.Context) error {
+func (t *activeTaskTracker) Shutdown(ctx context.Context) error {
 	t.cancelFunc()
 
 	if t.count.Load() == 0 {
@@ -107,7 +118,7 @@ func (t *ActiveTaskTracker) Shutdown(ctx context.Context) error {
 	}
 }
 
-// NewActiveTaskTracker creates and returns a new ActiveTaskTracker instance.
+// NewActiveTaskTracker creates and returns a new TaskTracker impl.
 // By default, it starts with zero active tasks and a background context
 // that can be canceled when shutdown is initiated.
 //
@@ -125,10 +136,21 @@ func (t *ActiveTaskTracker) Shutdown(ctx context.Context) error {
 //
 //	// Once you decide to stop the application:
 //	tracker.Shutdown() // Blocks until all tasks have finished.
-func NewActiveTaskTracker() *ActiveTaskTracker {
-	att := &ActiveTaskTracker{
+func NewActiveTaskTracker() TaskTracker {
+	att := &activeTaskTracker{
 		doneCh: make(chan bool),
 	}
 	att.ctx, att.cancelFunc = context.WithCancel(context.Background())
 	return att
+}
+
+// GetTaskTracker retrieves the activeTaskTracker instance from the gin.Context.
+// Returns an error if task tracker is not provided
+func GetTaskTracker(ctx *gin.Context) (TaskTracker, error) {
+	tracker, exists := ctx.Get("taskTracker")
+	if !exists {
+		return nil, ErrTaskTrackerNotFound
+	}
+
+	return tracker.(*activeTaskTracker), nil
 }

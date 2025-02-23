@@ -123,12 +123,14 @@ const (
 // // handler now includes all defined routes and associated middleware within the V3 group.
 // ```
 type Handler struct {
-	routes      []*Route
+	routes       []*Route
+	casualRoutes []*casualRoute
+
 	groups      []*Group
 	middlewares []*Middleware
 }
 
-// NewHandler creates a new Handler by analyzing the provided `handlerStruct`.
+// AsHandler creates a new Handler by analyzing the provided `handlerStruct`.
 // It recursively extracts all methods and fields, builds routes, groups, and middleware,
 // and returns a fully initialized Handler instance.
 //
@@ -136,14 +138,14 @@ type Handler struct {
 // Given `CheckoutRouterImpl` and `ProductRoutesImpl` as in the examples above, you could do:
 //
 // ```go
-// handler := NewHandler(&ProductRoutesImpl{})
+// handler := AsHandler(&ProductRoutesImpl{})
 // // The handler now holds routes like GET /api/v3/products (with auth, logging middleware),
 // // and GET /api/v3/products/:id, ready to be registered in your Gin engine.
 // ```
-func NewHandler(handlerStruct interface{}) (*Handler, error) {
+func AsHandler(handlerStruct interface{}) (*Handler, error) {
 	handler := &Handler{}
 
-	ginHandlers := handler.getAllGinHandlers(reflect.ValueOf(handlerStruct))
+	ginHandlers, casualHandlers := handler.getAllGinHandlers(reflect.ValueOf(handlerStruct))
 	flatFields := handler.getAllReflectionFieldsRecursive(reflect.ValueOf(handlerStruct))
 
 	err := handler.searchForGroups(flatFields)
@@ -156,7 +158,7 @@ func NewHandler(handlerStruct interface{}) (*Handler, error) {
 
 	handler.searchForMiddlewares(flatFields, ginHandlers)
 
-	err = handler.searchForRoutes(flatFields, ginHandlers)
+	err = handler.searchForRoutes(flatFields, ginHandlers, casualHandlers)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to search for routes: %w",
@@ -177,10 +179,11 @@ func NewHandler(handlerStruct interface{}) (*Handler, error) {
 // ListProducts Route `route:"GET /products" middlewares:"auth,logging" group:"v3"`
 // ```
 // This defines a GET route at `/api/v3/products` (because of group "v3"), with middleware "auth" and "logging".
-func (h *Handler) searchForRoutes(flatFields []reflect.StructField, foundHandlers map[string]gin.HandlerFunc) error {
+func (h *Handler) searchForRoutes(flatFields []reflect.StructField, foundHandlers map[string]gin.HandlerFunc, foundCasualHandlers map[string]*casualHandler) error {
 	typeOfRoute := reflect.TypeOf(Route{})
 	var err error
 	routes := make([]*Route, 0)
+	casualRoutes := make([]*casualRoute, 0)
 
 	for _, fieldType := range flatFields {
 		if fieldType.Type != typeOfRoute {
@@ -200,10 +203,25 @@ func (h *Handler) searchForRoutes(flatFields []reflect.StructField, foundHandler
 			}
 
 			routes = append(routes, route)
+		} else if foundCasualHandlers[fieldType.Name] != nil {
+			route := &casualRoute{
+				handler:     foundCasualHandlers[fieldType.Name],
+				middlewares: h.parseMiddlewaresTag(fieldType.Tag.Get(MiddlewaresTag)),
+				group:       fieldType.Tag.Get(GroupTag),
+			}
+
+			route.method, route.path, err = h.parseRouteTag(fieldType.Tag.Get(RouteTag))
+			if err != nil {
+				return fmt.Errorf("failed to parse route tag: %w", err)
+			}
+
+			casualRoutes = append(casualRoutes, route)
 		}
 	}
 
 	h.routes = routes
+	h.casualRoutes = casualRoutes
+
 	return nil
 }
 
@@ -265,18 +283,25 @@ func (h *Handler) searchForMiddlewares(flatFields []reflect.StructField, foundHa
 // getAllGinHandlers scans the given reflected value (struct) for methods
 // that match the signature `func(*gin.Context)` and returns them in a map keyed by method name.
 // These methods can be route handlers or middleware handlers.
-func (h *Handler) getAllGinHandlers(rv reflect.Value) map[string]gin.HandlerFunc {
+func (h *Handler) getAllGinHandlers(rv reflect.Value) (map[string]gin.HandlerFunc, map[string]*casualHandler) {
 	rt := rv.Type()
 	handlers := make(map[string]gin.HandlerFunc)
+	casualHandlers := make(map[string]*casualHandler)
 
 	for i := 0; i < rt.NumMethod(); i++ {
 		method := rt.Method(i)
+
 		if isSimpleGinHandler(method.Type) {
 			handlers[method.Name] = rv.Method(i).Interface().(func(*gin.Context))
+		} else if isCasualHandler(method.Type) {
+			casualHandlers[method.Name] = &casualHandler{
+				rv: &rv,
+				rm: &method,
+			}
 		}
 	}
 
-	return handlers
+	return handlers, casualHandlers
 }
 
 // searchForGroups finds fields of type `Group`, parses the `group` tag to identify the path prefix,
@@ -470,6 +495,7 @@ type Middleware struct {
 // - `Middlewares`: A list of middleware names applied to all routes in the group.
 //
 // **Example:**
+//
 // ```go
 //
 //	type IV3Group struct {

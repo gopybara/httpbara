@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/gopybara/httpbara/casual"
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
 	"strings"
 	"syscall"
 	"time"
@@ -23,7 +25,7 @@ import (
 // - flatMiddlewares: A map of middleware names to Middleware objects. Each middleware can also apply additional middleware.
 // - flatRoutes: A slice of Route objects representing all routes extracted from Handler instances.
 type core struct {
-	Params
+	params
 
 	flatGroups      map[string]*Group
 	flatMiddlewares map[string]*Middleware
@@ -66,17 +68,17 @@ type Engine interface {
 // err := engine.Run(":8080")
 // // waiting for error
 // ```
-func New(handlers []*Handler, opts ...paramsCb) (Engine, error) {
+func New(handlers []*Handler, opts ...ParamsCb) (Engine, error) {
 	c := &core{
 		flatGroups:      make(map[string]*Group),
 		flatMiddlewares: make(map[string]*Middleware),
 		flatRoutes:      make([]*Route, 0),
 	}
 
-	c.Params.shutdownTimeout = 30 * time.Second
+	c.params.shutdownTimeout = 30 * time.Second
 
 	for _, opt := range opts {
-		err := opt(&c.Params)
+		err := opt(&c.params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
@@ -88,6 +90,14 @@ func New(handlers []*Handler, opts ...paramsCb) (Engine, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create base gin engine: %w", err)
 		}
+	}
+
+	if c.casualResponseHandler == nil {
+		c.casualResponseHandler = defaultCasualResponder[any]
+	}
+
+	if c.casualResponseErrorHandler == nil {
+		c.casualResponseErrorHandler = defaultCasualErrorResponder
 	}
 
 	// Set a default logger if none provided
@@ -112,13 +122,127 @@ func (c *core) flatHandlers(handlers []*Handler) {
 	for _, handler := range handlers {
 		c.flatRoutes = append(c.flatRoutes, handler.routes...)
 
+		for _, casualR := range handler.casualRoutes {
+			useGinContext := false
+			if casualR.handler.rm.Type.In(1) == reflect.TypeOf((*gin.Context)(nil)) {
+				useGinContext = true
+			}
+
+			reqType := casualR.handler.rm.Type.In(2)
+
+			cb := func(ctx *gin.Context) {
+				rcb := getResponseCallback(ctx)
+
+				var ct = ctx.Request.Context()
+				if useGinContext {
+					ct = ctx
+				}
+
+				var req interface{}
+				if reqType.Kind() == reflect.Ptr {
+					req = reflect.New(reqType.Elem()).Interface()
+				} else {
+					req = reflect.New(reqType).Interface()
+				}
+
+				err := ctx.ShouldBind(req)
+				if err != nil {
+					rcb(c.casualResponseErrorHandler(err))
+					ctx.Abort()
+					return
+				}
+				respArr := casualR.handler.rm.Func.Call([]reflect.Value{*casualR.handler.rv, reflect.ValueOf(ct), reflect.ValueOf(req)})
+
+				statusCode := http.StatusOK
+				if respArr[0].MethodByName("StatusCode").IsValid() {
+					values := respArr[0].MethodByName("StatusCode").Call([]reflect.Value{})
+					statusCode = values[0].Interface().(int)
+				}
+
+				paramsCbs := []casual.HttpResponseParamsCb{
+					casual.WithHttpStatusCode(statusCode),
+				}
+
+				switch len(respArr) {
+				case 1:
+					if respArr[0].IsNil() {
+						ctx.AbortWithStatus(statusCode)
+						return
+					}
+
+					rcb(c.params.casualResponseErrorHandler(respArr[0].Interface().(error)))
+					ctx.Abort()
+					return
+				case 2:
+					if respArr[1].IsNil() {
+						if !respArr[1].IsNil() {
+							rcb(c.casualResponseErrorHandler(respArr[1].Interface().(error)))
+							ctx.Abort()
+							return
+						}
+						if respArr[0].MethodByName("Meta").IsValid() &&
+							respArr[0].MethodByName("Meta").Type().NumIn() == 0 &&
+							respArr[0].MethodByName("Meta").Type().NumOut() == 1 &&
+							respArr[0].MethodByName("Meta").Type().Out(0).Kind() == reflect.Map {
+							values := respArr[0].MethodByName("Meta").Call([]reflect.Value{})
+							dataMap := make(map[string]interface{})
+
+							next := values[0].MapRange()
+
+							for {
+								if !next.Next() {
+									break
+								}
+
+								dataMap[next.Key().String()] = next.Value().Interface()
+							}
+
+							paramsCbs = append(paramsCbs, casual.WithMeta(dataMap))
+						}
+
+						rcb(c.params.casualResponseHandler(respArr[0].Interface(), paramsCbs...))
+						ctx.Abort()
+					} else {
+						rcb(c.params.casualResponseErrorHandler(respArr[1].Interface().(error)))
+						ctx.Abort()
+						return
+					}
+				default:
+					c.log.Panic(
+						"casual handler returned more than two values",
+						"handler", casualR.handler.rm.Name,
+						"route", casualR.path,
+						"method", casualR.method)
+				}
+			}
+
+			c.flatRoutes = append(c.flatRoutes, &Route{
+				method:      casualR.method,
+				path:        casualR.path,
+				handler:     cb,
+				middlewares: casualR.middlewares,
+				group:       casualR.group,
+			})
+		}
+
 		for _, group := range handler.groups {
 			c.flatGroups[group.name] = group
 		}
 
 		for _, middleware := range handler.middlewares {
-			c.flatMiddlewares[middleware.middleware] = middleware
+			c.flatMiddlewares[strings.ToLower(middleware.middleware)] = middleware
 		}
+	}
+}
+
+type responseCallback func(code int, obj any)
+
+func getResponseCallback(ctx *gin.Context) responseCallback {
+	switch ctx.GetHeader("Accept") {
+	case "application/xml":
+		return ctx.XML
+	default:
+		return ctx.JSON
 	}
 }
 
