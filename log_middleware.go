@@ -49,12 +49,9 @@ func AddLogFieldToAccessLog(ctx *gin.Context, value ...interface{}) {
 }
 
 func NewAccessLogMiddleware(log Logger) (*Handler, error) {
-	alm := &accessLogMiddleware{
+	alm := accessLogMiddleware{
 		log: log,
 	}
 
-	return AsHandler(&Middleware{
-		handler:    alm.AccessLogMiddleware,
-		middleware: "log",
-	})
+	return AsHandler(&alm)
 }
