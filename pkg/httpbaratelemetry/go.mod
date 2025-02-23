@@ -6,7 +6,7 @@ toolchain go1.23.3
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/gopybara/httpbara v0.0.1
+	github.com/gopybara/httpbara v1.0.6
 	go.opentelemetry.io/otel v1.34.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.34.0
 	go.opentelemetry.io/otel/sdk v1.34.0
@@ -45,3 +45,5 @@ require (
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/gopybara/httpbara v0.0.1 => ../../
