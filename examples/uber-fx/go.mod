@@ -6,8 +6,8 @@ toolchain go1.23.3
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/gopybara/httpbara v0.0.0-20250223225918-b4614a19300b
-	github.com/gopybara/httpbara/pkg/httpbarazap v0.0.0-20250223225918-b4614a19300b
+	github.com/gopybara/httpbara v1.0.7
+	github.com/gopybara/httpbara/pkg/httpbarazap v0.0.0-20250223231708-9321da48ac04
 	go.uber.org/fx v1.23.0
 	go.uber.org/zap v1.27.0
 )

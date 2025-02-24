@@ -38,9 +38,7 @@ func (omi *otelMiddleware) InjectTrace(ctx *gin.Context) {
 		traceCtx = trace.ContextWithSpan(ctx.Request.Context(), span)
 	} else {
 		traceCtx, span = omi.tp.NewSpan(ctx.Request.Context(), spanName)
-
 		ctx.Request.Header.Set("Traceparent", omi.tp.createTraceparent(traceCtx))
-
 		omi.tp.propagator().Inject(traceCtx, propagation.HeaderCarrier(ctx.Request.Header))
 
 		ctx.Request = ctx.Request.WithContext(traceCtx)

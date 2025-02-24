@@ -32,10 +32,6 @@ github.com/gopybara/httpbara v1.0.6 h1:MNNgA0rlzfNhyHa2LPp2MDwYVs3jgoy4OrLunga0I
 github.com/gopybara/httpbara v1.0.6/go.mod h1:E/iuQKyn/mbuznoPCJ0V7dj22VC8DsiFQ7gMbDlVu0Y=
 github.com/gopybara/httpbara v1.0.7 h1:piAiNgR3jgMdOgspBnetn7SfcK8V56m5zxlnvhkLxIc=
 github.com/gopybara/httpbara v1.0.7/go.mod h1:E/iuQKyn/mbuznoPCJ0V7dj22VC8DsiFQ7gMbDlVu0Y=
-github.com/gopybara/httpbara/pkg/httpbarazap v0.0.0-20250223225918-b4614a19300b h1:wHkoDGc+GqGAEy2hVInbJPDXLXFSmGTGyu/BiIJkuTA=
-github.com/gopybara/httpbara/pkg/httpbarazap v0.0.0-20250223225918-b4614a19300b/go.mod h1:Wr5J6WSeOho7CImy9067kVdSdLZ2sxS2J9KEBL+ZCkQ=
-github.com/gopybara/httpbara/pkg/httpbarazap v0.0.0-20250223231708-9321da48ac04 h1:HWl0O3A+5O4hs8MYT6KPrsyuTmFAGMVyR9k+Hf6Sg4I=
-github.com/gopybara/httpbara/pkg/httpbarazap v0.0.0-20250223231708-9321da48ac04/go.mod h1:Wr5J6WSeOho7CImy9067kVdSdLZ2sxS2J9KEBL+ZCkQ=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/klauspost/cpuid/v2 v2.0.9/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
