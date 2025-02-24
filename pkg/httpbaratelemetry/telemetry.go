@@ -27,15 +27,16 @@ type TelemetryProvider interface {
 }
 
 type loggerWithContext struct {
-	propagator propagation.TextMapPropagator
-	tp         *sdktrace.TracerProvider
-	ctx        context.Context
-	l          httpbara.Logger
+	propagator    propagation.TextMapPropagator
+	tp            *sdktrace.TracerProvider
+	ctx           context.Context
+	l             httpbara.Logger
+	telemetryKeys *TelemetryKeys
 }
 
 func (lwc *loggerWithContext) addSpanToFields(fields *[]any) {
 	if span := trace.SpanFromContext(lwc.ctx); span != nil {
-		*fields = append(*fields, "trace_id", span.SpanContext().TraceID().String(), "span_id", span.SpanContext().SpanID().String())
+		*fields = append(*fields, lwc.telemetryKeys.TraceID, span.SpanContext().TraceID().String(), lwc.telemetryKeys.SpanID, span.SpanContext().SpanID().String())
 	}
 }
 
@@ -74,9 +75,10 @@ type telemetryOpts struct {
 
 	tracerName    string `default:"httpbara"`
 	traceProvider *sdktrace.TracerProvider
-	propagator    propagation.TextMapPropagator
 	// Can be empty
 	// If empty propagation.TraceContext will be used by default
+	propagator propagation.TextMapPropagator
+
 	telemetryKeys *TelemetryKeys
 }
 
@@ -121,10 +123,11 @@ func (pi *providerImpl) Provider() *sdktrace.TracerProvider {
 
 func (pi *providerImpl) LogWithContext(ctx context.Context) httpbara.Logger {
 	return &loggerWithContext{
-		ctx:        ctx,
-		propagator: pi.opts.propagator,
-		tp:         pi.opts.traceProvider,
-		l:          pi.opts.log,
+		ctx:           ctx,
+		propagator:    pi.opts.propagator,
+		tp:            pi.opts.traceProvider,
+		l:             pi.opts.log,
+		telemetryKeys: pi.opts.telemetryKeys,
 	}
 }
 
