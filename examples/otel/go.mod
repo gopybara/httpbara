@@ -5,8 +5,8 @@ go 1.23.0
 toolchain go1.23.3
 
 require (
-	github.com/gopybara/httpbara v0.0.0-20250223225918-b4614a19300b
-	github.com/gopybara/httpbara/pkg/httpbaratelemetry v0.0.0-20250223225918-b4614a19300b
+	github.com/gopybara/httpbara v1.0.7
+	github.com/gopybara/httpbara/pkg/httpbaratelemetry v0.0.0-20250223231708-9321da48ac04
 	go.opentelemetry.io/otel v1.34.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.34.0
 	go.opentelemetry.io/otel/sdk v1.34.0

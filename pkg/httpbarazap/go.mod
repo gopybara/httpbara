@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.23.3
 
 require (
-	github.com/gopybara/httpbara v1.0.6
+	github.com/gopybara/httpbara v1.0.7
 	go.uber.org/zap v1.27.0
 )
 

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/gopybara/httpbara"
 )
 
 type TestHandlerDescriber struct {
-	CasualRoute httpbara.Route `route:"GET /foo"`
+	API         httpbara.Group      `group:"/api"`
+	CasualRoute httpbara.Route      `route:"GET /foo" group:"api" middlewares:"logging"`
+	Middleware  httpbara.Middleware `middleware:"logging"`
 }
 
 type TestHandler struct {
@@ -14,12 +17,14 @@ type TestHandler struct {
 }
 
 type Bar struct {
-	Baz string
+	Baz string `json:"baz"`
 }
 
-func (t *TestHandler) CasualRoute(ctx *gin.Context, req *Bar) (*Bar, error) {
-	httpbara.AddLogFieldToAccessLog(ctx, "foo", "bar")
+func (t *TestHandler) Middleware(ctx *gin.Context) {
+	ctx.Next()
+}
 
+func (t *TestHandler) CasualRoute(ctx context.Context, req *Bar) (*Bar, error) {
 	return req, nil
 }
 
