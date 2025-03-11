@@ -28,8 +28,14 @@ func NewHTTPResponse[T any](data *T, opts ...HttpResponseParamsCb) (int, *HttpRe
 		metadata = params.meta
 	}
 
-	if data != nil && elem.Kind() == reflect.Slice || elem.Kind() == reflect.Array {
-		metadata["total"] = reflect.ValueOf(data).Len()
+	if data != nil && (elem.Kind() == reflect.Slice || elem.Kind() == reflect.Array) {
+		if metadata == nil {
+			metadata = make(map[string]interface{})
+		}
+
+		if _, ok := metadata["total"]; !ok {
+			metadata["total"] = elem.Len()
+		}
 	}
 
 	if params.statusCode == nil {
