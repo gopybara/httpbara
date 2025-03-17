@@ -315,7 +315,11 @@ func (c *core) applyHandlers() {
 
 		handleStack = append(handleStack, route.handler)
 
-		c.gin.Handle(route.method, path, handleStack...)
+		if route.method == "ANY" {
+			c.gin.Any(path, handleStack...)
+		} else {
+			c.gin.Handle(route.method, path, handleStack...)
+		}
 
 		c.log.Info("route was registered",
 			"method", route.method,
