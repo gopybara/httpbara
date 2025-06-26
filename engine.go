@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/gopybara/httpbara/casual"
 	"net/http"
 	"os"
@@ -138,20 +139,28 @@ func (c *core) flatHandlers(handlers []*Handler) {
 					ct = ctx
 				}
 
-				var req interface{}
-				if reqType.Kind() == reflect.Ptr {
-					req = reflect.New(reqType.Elem()).Interface()
-				} else {
-					req = reflect.New(reqType).Interface()
-				}
-
-				err := ctx.ShouldBind(req)
+				reqVal, err := dynamicBind(ctx, reqType)
 				if err != nil {
 					rcb(c.casualResponseErrorHandler(err))
 					ctx.Abort()
 					return
 				}
-				respArr := casualR.handler.rm.Func.Call([]reflect.Value{*casualR.handler.rv, reflect.ValueOf(ct), reflect.ValueOf(req)})
+
+				var arg reflect.Value
+				switch reqType.Kind() {
+				case reflect.Struct:
+					// handler.Handle(ctx, req contracts.PublishEventsEvent[…])
+					// ждёт сам struct, разворачиваем указатель
+					arg = reqVal.Elem()
+				case reflect.Ptr:
+					// handler.Handle(ctx, req *contracts.PublishEventsEvent[…])
+					// ждёт pointer, передаём reqVal
+					arg = reqVal
+				default:
+					c.log.Panic("unexpected reqType kind", "kind", reqType.Kind().String())
+				}
+
+				respArr := casualR.handler.rm.Func.Call([]reflect.Value{*casualR.handler.rv, reflect.ValueOf(ct), arg})
 
 				statusCode := http.StatusOK
 				if respArr[0].MethodByName("StatusCode").IsValid() {
@@ -233,6 +242,24 @@ func (c *core) flatHandlers(handlers []*Handler) {
 			c.flatMiddlewares[strings.ToLower(middleware.middleware)] = middleware
 		}
 	}
+}
+
+func dynamicBind(ctx *gin.Context, reqType reflect.Type) (reflect.Value, error) {
+	base := reqType
+	for base.Kind() == reflect.Ptr {
+		base = base.Elem()
+	}
+
+	if base.Kind() != reflect.Struct {
+		return reflect.Value{}, fmt.Errorf("dynamicBind: expected struct type, got %s", base.Kind())
+	}
+
+	reqPtr := reflect.New(base)
+	if err := binding.JSON.Bind(ctx.Request, reqPtr.Interface()); err != nil {
+		return reflect.Value{}, err
+	}
+
+	return reqPtr, nil
 }
 
 type responseCallback func(code int, obj any)
