@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 	"github.com/gopybara/httpbara/casual"
 	"net/http"
 	"os"
@@ -255,7 +254,7 @@ func dynamicBind(ctx *gin.Context, reqType reflect.Type) (reflect.Value, error) 
 	}
 
 	reqPtr := reflect.New(base)
-	if err := binding.JSON.Bind(ctx.Request, reqPtr.Interface()); err != nil {
+	if err := ctx.ShouldBind(reqPtr.Interface()); err != nil {
 		return reflect.Value{}, err
 	}
 
@@ -415,20 +414,20 @@ func (c *core) Run(addr string) error {
 		}
 	case sig := <-quit:
 		c.log.Info("shutting down server", "signal", sig)
-	
+
 		ctx, cancel := context.WithTimeout(context.Background(), c.shutdownTimeout)
 		defer cancel()
-	
+
 		if err := srv.Shutdown(ctx); err != nil {
 			return fmt.Errorf("server shutdown failed: %w", err)
 		}
-	
+
 		if c.taskTracker != nil {
 			if err := c.taskTracker.Shutdown(ctx); err != nil {
 				return fmt.Errorf("task tracker shutdown failed: %w", err)
 			}
 		}
 	}
-	
+
 	return nil
 }
