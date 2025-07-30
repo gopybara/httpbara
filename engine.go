@@ -408,22 +408,27 @@ func (c *core) Run(addr string) error {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	sig := <-quit
-
-	c.log.Info("shutting down server", "signal", sig)
-
-	ctx, cancel := context.WithTimeout(context.Background(), c.shutdownTimeout)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		return fmt.Errorf("server shutdown failed: %w", err)
-	}
-
-	if c.taskTracker != nil {
-		if err := c.taskTracker.Shutdown(ctx); err != nil {
-			return fmt.Errorf("task tracker shutdown failed: %w", err)
+	select {
+	case err := <-errChan:
+		if err != nil {
+			return fmt.Errorf("server failed to start: %w", err)
+		}
+	case sig := <-quit:
+		c.log.Info("shutting down server", "signal", sig)
+	
+		ctx, cancel := context.WithTimeout(context.Background(), c.shutdownTimeout)
+		defer cancel()
+	
+		if err := srv.Shutdown(ctx); err != nil {
+			return fmt.Errorf("server shutdown failed: %w", err)
+		}
+	
+		if c.taskTracker != nil {
+			if err := c.taskTracker.Shutdown(ctx); err != nil {
+				return fmt.Errorf("task tracker shutdown failed: %w", err)
+			}
 		}
 	}
-
-	return <-errChan
+	
+	return nil
 }
