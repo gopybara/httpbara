@@ -254,7 +254,23 @@ func dynamicBind(ctx *gin.Context, reqType reflect.Type) (reflect.Value, error) 
 	}
 
 	reqPtr := reflect.New(base)
-	if err := ctx.ShouldBind(reqPtr.Interface()); err != nil {
+
+	var binder func(interface{}) error
+
+	contentType := ctx.ContentType()
+
+	switch {
+	case strings.HasSuffix(contentType, "json"):
+		binder = ctx.ShouldBindJSON
+	case strings.HasSuffix(contentType, "xml"):
+		binder = ctx.ShouldBindXML
+	case strings.HasSuffix(contentType, "yaml"):
+		binder = ctx.ShouldBindYAML
+	default:
+		binder = ctx.ShouldBind
+	}
+
+	if err := binder(reqPtr.Interface()); err != nil {
 		return reflect.Value{}, err
 	}
 
